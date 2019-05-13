@@ -2,31 +2,21 @@ package main
 
 import (
 	"io"
-	"path/filepath"
 	"os"
+	"os/exec"
 )
 
-func execution(commandName string, args [] string, stdout, stderr io.Writer) {
-	if logDir == "" {
-		stdout = os.Stdout
-		stderr = os.Stderr
-	} else {
-		ts := time.Now().Unix()
+func execution(commandName string, args []string, stdout, stderr io.Writer) (*os.ProcessState, error) {
+	cmd := exec.Command(commandName, args...)
+	childStdout, _ := cmd.StdoutPipe()
+	childStderr, _ := cmd.StderrPipe()
 
-		stdoutFileName := fmt.Sprintf("%s-%v-stdout.log", commandName, ts)
-		stdoutFile, err := os.Create(filepath.Join(logDir, stdoutFileName))
-		if err != nil {
-			return nil, nil, err
-		}
-		stdout = io.MultiWriter(os.Stdout, stdoutFile)
+	go io.Copy(stdout, childStdout)
+	go io.Copy(stderr, childStderr)
 
-		stderrFileName := fmt.Sprintf("%s-%v-stderr.log", commandName, ts)
-		stderrFile, err := os.Create(filepath.Join(logDir, stderrFileName))
-
-		if err != nil {
-			return nil, nil, err
-		}
-		stderr = io.MultiWriter(os.Stderr, stderrFile)
+	err := cmd.Run()
+	if err != nil {
+		return nil, err
 	}
-	return
+	return cmd.ProcessState, nil
 }
